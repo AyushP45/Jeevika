@@ -1,0 +1,117 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 222 47% 6%;
+  --foreground: 210 40% 98%;
+  --card: 222 42% 9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 42% 9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 158 73% 48%;
+  --primary-foreground: 163 80% 7%;
+  --secondary: 245 58% 61%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 220 26% 14%;
+  --muted-foreground: 215 18% 70%;
+  --accent: 199 89% 58%;
+  --accent-foreground: 222 47% 6%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 218 28% 20%;
+  --input: 218 28% 20%;
+  --ring: 158 73% 48%;
+}
+
+.light {
+  --background: 210 40% 98%;
+  --foreground: 222 47% 8%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 8%;
+  --muted: 210 32% 92%;
+  --muted-foreground: 215 18% 35%;
+  --border: 214 32% 84%;
+  --input: 214 32% 84%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    radial-gradient(circle at 18% -10%, rgba(16, 185, 129, 0.14), transparent 34%),
+    radial-gradient(circle at 82% 0%, rgba(139, 92, 246, 0.13), transparent 30%),
+    hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.glass {
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.82), rgba(15, 23, 42, 0.52));
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 20px 70px rgba(2, 6, 23, 0.32);
+  backdrop-filter: blur(20px);
+}
+
+.light .glass {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.1);
+}
+
+.gradient-text {
+  background: linear-gradient(90deg, #f8fafc, #77f3c6 42%, #c4b5fd 78%, #e0f2fe);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.light .gradient-text {
+  background: linear-gradient(90deg, #0f172a, #047857 42%, #6d28d9 78%, #0369a1);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.field {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid hsl(var(--border));
+  background: rgba(15, 23, 42, 0.56);
+  padding: 0.8rem 0.95rem;
+  color: hsl(var(--foreground));
+  outline: none;
+}
+
+.light .field {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.field:focus {
+  border-color: rgba(16, 185, 129, 0.72);
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
