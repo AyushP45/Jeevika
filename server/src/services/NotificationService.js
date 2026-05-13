@@ -21,6 +21,22 @@ class NotificationService {
     this.useConsoleMock = !process.env.SMTP_USER || process.env.SMTP_USER.includes("your-email");
     this.io = null;
 
+    // Fast2SMS setup
+    this.fast2smsKey = process.env.FAST2SMS_API_KEY;
+    
+    // Twilio setup
+    this.twilioSid = process.env.TWILIO_ACCOUNT_SID;
+    this.twilioToken = process.env.TWILIO_AUTH_TOKEN;
+    this.twilioPhone = process.env.TWILIO_PHONE_NUMBER;
+
+    if (this.fast2smsKey && !this.fast2smsKey.includes("your_")) {
+      console.log("✅ Fast2SMS configured for real OTP delivery");
+    } else if (this.twilioSid && this.twilioToken && !this.twilioSid.includes("your_")) {
+      console.log("✅ Twilio configured for real OTP delivery");
+    } else {
+      console.log("⚠️  SMS Providers not configured — SMS will be mocked to console");
+    }
+
     if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
       webpush.setVapidDetails(
         "mailto:support@jeevika.app",
@@ -61,22 +77,58 @@ class NotificationService {
   }
 
   async sendSMS(phone, message) {
-    // Fast2SMS/Twilio mock integration
-    // In production, you would call the Twilio SDK or Fast2SMS HTTP API here
-    const isMock = !process.env.TWILIO_SID && !process.env.FAST2SMS_API_KEY;
+    // Clean phone: Fast2SMS needs 10-digit Indian number without +91
+    const cleanPhone = phone.replace(/[\s\-\+]/g, "").replace(/^91/, "");
 
-    if (isMock) {
-      console.log(`\n======================================================`);
-      console.log(`📱 MOCK SMS NOTIFICATION`);
-      console.log(`PHONE: ${phone}`);
-      console.log(`MESSAGE: ${message}`);
-      console.log(`======================================================\n`);
-      return { success: true, mock: true };
+    // If Fast2SMS is configured, send real SMS
+    if (this.fast2smsKey && !this.fast2smsKey.includes("your_")) {
+      try {
+        const otpMatch = message.match(/\d{6}/);
+        const otp = otpMatch ? otpMatch[0] : message;
+        
+        // Switch to 'q' (Quick SMS) route to bypass the "Verify Website" requirement
+        const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${this.fast2smsKey}&route=q&message=${encodeURIComponent(message)}&numbers=${cleanPhone}`;
+        
+        const res = await fetch(url, { method: "GET" });
+        const data = await res.json();
+
+        if (data.return) {
+          console.log(`📱 SMS sent to ${cleanPhone} via Fast2SMS — ID: ${data.request_id}`);
+          return { success: true, requestId: data.request_id };
+        } else {
+          console.error(`📱 Fast2SMS error:`, data.message || data);
+        }
+      } catch (error) {
+        console.error(`📱 Fast2SMS failed for ${cleanPhone}:`, error.message);
+      }
     }
 
-    // Actual Implementation would go here...
-    console.log(`Actual SMS implementation not configured.`);
-    return { success: false, error: "Not configured" };
+    // If Twilio is configured, send real SMS
+    if (this.twilioSid && this.twilioToken && !this.twilioSid.includes("your_")) {
+      try {
+        const twilio = (await import("twilio")).default;
+        const client = twilio(this.twilioSid, this.twilioToken);
+        
+        const response = await client.messages.create({
+          body: message,
+          from: this.twilioPhone,
+          to: phone.startsWith("+") ? phone : `+91${cleanPhone}`
+        });
+
+        console.log(`📱 SMS sent to ${phone} via Twilio — SID: ${response.sid}`);
+        return { success: true, requestId: response.sid };
+      } catch (error) {
+        console.error(`📱 Twilio failed for ${phone}:`, error.message);
+      }
+    }
+
+    // Mock fallback (always runs in dev or if Fast2SMS fails)
+    console.log(`\n======================================================`);
+    console.log(`📱 MOCK SMS NOTIFICATION`);
+    console.log(`PHONE: ${phone}`);
+    console.log(`MESSAGE: ${message}`);
+    console.log(`======================================================\n`);
+    return { success: true, mock: true };
   }
 
   // Combined function for high-priority alerts

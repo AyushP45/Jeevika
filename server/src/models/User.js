@@ -24,6 +24,8 @@ export const User = sequelize.define("User", {
   availability: { type: DataTypes.BOOLEAN, defaultValue: true },
   verificationStatus: { type: DataTypes.ENUM("None", "Pending", "Verified", "Rejected"), defaultValue: "None" },
   isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+  kycStatus: { type: DataTypes.ENUM("None", "Pending", "Verified", "Rejected"), defaultValue: "None" },
+  isKycVerified: { type: DataTypes.BOOLEAN, defaultValue: false },
   pushSubscription: { type: DataTypes.JSON, allowNull: true }
 }, {
   timestamps: true

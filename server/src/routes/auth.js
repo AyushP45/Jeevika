@@ -4,9 +4,82 @@ import { Op } from "sequelize";
 import { OAuth2Client } from "google-auth-library";
 import { requireAuth } from "../middleware/auth.js";
 import { User } from "../models/associations.js";
+import { notificationService } from "../services/NotificationService.js";
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
+
+// ─── In-memory OTP store ─────────────────────────────────
+// Map<phone, { code, expiresAt, verified }>
+const otpStore = new Map();
+const OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+
+function generateOTP() {
+  return String(Math.floor(100000 + Math.random() * 900000)); // 6-digit
+}
+
+// POST /api/auth/send-otp — send OTP to phone number
+router.post("/send-otp", async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ message: "Phone number is required" });
+
+    // Rate limit: don't allow resend within 60 seconds
+    const existing = otpStore.get(phone);
+    if (existing && (Date.now() - (existing.createdAt || 0)) < 60000) {
+      return res.status(429).json({ message: "Please wait 60 seconds before requesting a new OTP" });
+    }
+
+    const code = generateOTP();
+    otpStore.set(phone, {
+      code,
+      expiresAt: Date.now() + OTP_EXPIRY_MS,
+      createdAt: Date.now(),
+      verified: false
+    });
+
+    // Send OTP via SMS (uses mock in dev, real provider in prod)
+    await notificationService.sendSMS(phone, `Your Jeevika verification code is: ${code}. Valid for 5 minutes.`);
+
+    console.log(`📱 OTP for ${phone}: ${code}`); // Always log for dev convenience
+
+    return res.json({ success: true, message: "OTP sent successfully" });
+  } catch (error) {
+    console.error("Send OTP error:", error);
+    return res.status(500).json({ message: "Failed to send OTP" });
+  }
+});
+
+// POST /api/auth/verify-otp — verify the OTP
+router.post("/verify-otp", async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) return res.status(400).json({ message: "Phone and OTP are required" });
+
+    const stored = otpStore.get(phone);
+
+    if (!stored) {
+      return res.status(400).json({ message: "No OTP was sent to this number. Please request a new one." });
+    }
+
+    if (Date.now() > stored.expiresAt) {
+      otpStore.delete(phone);
+      return res.status(400).json({ message: "OTP has expired. Please request a new one." });
+    }
+
+    if (stored.code !== otp) {
+      return res.status(400).json({ message: "Invalid OTP. Please check and try again." });
+    }
+
+    // Mark as verified
+    otpStore.set(phone, { ...stored, verified: true });
+
+    return res.json({ success: true, message: "Phone number verified!" });
+  } catch (error) {
+    console.error("Verify OTP error:", error);
+    return res.status(500).json({ message: "Failed to verify OTP" });
+  }
+});
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const googleClient = GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.includes("your_google") 
   ? new OAuth2Client(GOOGLE_CLIENT_ID) 
@@ -84,6 +157,12 @@ router.post("/register", async (req, res) => {
     if (!phone) return res.status(400).json({ message: "Mobile number is required" });
     if (!role) return res.status(400).json({ message: "Role is required" });
 
+    // Verify phone was OTP-verified
+    const otpEntry = otpStore.get(phone);
+    if (!otpEntry || !otpEntry.verified) {
+      return res.status(400).json({ message: "Phone number must be verified with OTP first", field: "phone" });
+    }
+
     // Check for duplicate phone
     const existingPhone = await User.findOne({ where: { phone } });
     if (existingPhone) {
@@ -99,6 +178,7 @@ router.post("/register", async (req, res) => {
     }
 
     const user = await User.createWithPassword(req.body);
+    otpStore.delete(phone); // Clean up verified OTP
     const token = sign(user);
     return res.status(201).json({ token, user: user.toSafeObject() });
   } catch (error) {
@@ -125,8 +205,13 @@ router.post("/login", async (req, res) => {
 
     // Find by email OR phone
     const where = {};
-    if (email) where.email = email;
-    else where.phone = phone;
+    if (email) {
+      where.email = email;
+    } else {
+      // Normalize phone for lookup
+      const clean = phone.replace(/[\s\-\+]/g, "");
+      where.phone = clean.length === 10 ? `+91${clean}` : `+${clean}`;
+    }
 
     const user = await User.findOne({ where });
 
@@ -221,6 +306,30 @@ router.post("/push-subscription", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Push subscription error:", error);
     return res.status(500).json({ message: "Failed to save push subscription" });
+  }
+});
+
+// POST /api/auth/kyc — Submit identity proof
+router.post("/kyc", requireAuth, async (req, res) => {
+  try {
+    const { idType, idPhoto } = req.body;
+    if (!idPhoto) return res.status(400).json({ message: "ID photo is required" });
+
+    const user = await User.findByPk(req.user.id);
+    if (user.kycStatus === "Verified") {
+      return res.status(400).json({ message: "Identity is already verified" });
+    }
+
+    await user.update({
+      kycStatus: "Pending",
+      idProof: idPhoto, // Store the photo in the existing idProof field
+      // We could also store idType if we add a field, but for now just updating status
+    });
+
+    res.json({ success: true, message: "KYC submitted for review", kycStatus: "Pending" });
+  } catch (error) {
+    console.error("KYC submission error:", error);
+    res.status(500).json({ message: "Failed to submit KYC" });
   }
 });
 

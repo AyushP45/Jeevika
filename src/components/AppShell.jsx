@@ -15,8 +15,8 @@ export function AppShell() {
   const location = useLocation();
   const { t } = useTranslation();
 
-  const isEmployer = user.role === "employer";
-  const isAdmin = user.role === "admin";
+  const isEmployer = user?.role === "employer";
+  const isAdmin = user?.role === "admin";
 
   const nav = [
     { to: "/dashboard", label: t("nav.dashboard"), icon: Home, show: true },
@@ -81,7 +81,7 @@ export function AppShell() {
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
             <Button variant="secondary" className="hidden sm:inline-flex" onClick={() => navigate("/profile")}>
-              {user.name}
+              {user?.name || "Profile"}
             </Button>
             <Button variant="ghost" onClick={() => { logout(); navigate("/"); }} aria-label="Logout">
               <LogOut className="h-4 w-4" />

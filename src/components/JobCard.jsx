@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion as Motion } from "framer-motion";
 import { toast } from "sonner";
-import { Clock, IndianRupee, MapPin, ShieldCheck, Star, Phone, HardHat, Volume2, VolumeX } from "lucide-react";
+import { Clock, IndianRupee, MapPin, ShieldCheck, Star, Phone, Users, Calendar, Volume2, VolumeX } from "lucide-react";
 import { Badge, Card } from "./ui/Card.jsx";
 import { Button } from "./ui/Button.jsx";
 import { formatINR } from "../lib/utils.js";
@@ -114,15 +114,19 @@ export function JobCard({ job }) {
               <MapPin className="h-4 w-4 text-emerald-300" />
               {job.location}
             </span>
-          <span className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-violet-300" />
-            {job.duration}
-          </span>
-          <span className="flex items-center gap-2">
-            <HardHat className="h-4 w-4 text-orange-300" />
-            {job.workersNeeded || 1} {t("job.workers_needed")}
-          </span>
-        </div>
+            <span className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-violet-300" />
+              {job.duration || "N/A"}
+            </span>
+            <span className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-sky-300" />
+              {job.startDate || "Date tbd"}
+            </span>
+            <span className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-orange-300" />
+              {job.workersNeeded || 1} {t("job.workers_needed")}
+            </span>
+          </div>
 
         <div className="mt-auto pt-5 border-t border-white/10 flex items-center justify-between">
           <div>

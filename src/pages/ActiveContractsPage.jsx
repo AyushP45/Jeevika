@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Briefcase, Clock, ShieldCheck, CheckCircle2, MessageSquare, Loader2, ArrowLeft, AlertTriangle } from "lucide-react";
+import { Briefcase, Clock, ShieldCheck, CheckCircle2, MessageSquare, Loader2, ArrowLeft, AlertTriangle, Shield, Eye } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card, Badge } from "../components/ui/Card.jsx";
 import { Button } from "../components/ui/Button.jsx";
@@ -28,11 +28,13 @@ export function ActiveContractsPage() {
       ]);
       
       // Filter jobs where user is either employer OR the assigned worker
-      // Only show jobs that are In Progress or recently Completed
+      // Filter jobs where user is involved
       const myActiveJobs = allJobs.filter(j => 
-        (j.employerId === user.id || j.workerId === user.id) && 
-        j.workerId && 
-        (j.status === "In Progress" || j.status === "Completed")
+        (j.employerId === user?.id || j.workerId === user?.id) && 
+        (
+          (j.workerId && (j.status === "In Progress" || j.status === "Completed")) ||
+          (user?.role === 'employer' && j.status === "Open")
+        )
       ).map(job => {
         // Attach the active transaction ID if it exists
         const activeTxn = txns.find(t => t.jobId === job.id && t.status === "Locked");
@@ -79,7 +81,7 @@ export function ActiveContractsPage() {
         revieweeId: reviewingJob.workerId || reviewingJob.employerId, // Placeholder logic
         rating,
         comment,
-        type: user.role === 'employer' ? 'EmployerToWorker' : 'WorkerToEmployer'
+        type: user?.role === 'employer' ? 'EmployerToWorker' : 'WorkerToEmployer'
       });
       toast.success("Review submitted! Thank you.");
       setReviewingJob(null);
@@ -210,8 +212,34 @@ export function ActiveContractsPage() {
                       <Button variant="outline" size="sm" as={Link} to={`/chat/${job.id}`} className="flex-1 md:flex-none border-white/10">
                         <MessageSquare className="h-4 w-4 mr-2" /> Discussion
                       </Button>
+
+                      {/* Worker: Start Verification Flow */}
+                      {user?.id === job.workerId && job.status === "In Progress" && (
+                        <Button 
+                          variant="primary" 
+                          size="sm" 
+                          as={Link} 
+                          to={`/verification/${job.id}`}
+                          className="flex-1 md:flex-none shadow-lg shadow-primary/20 bg-gradient-to-r from-violet-500 to-primary"
+                        >
+                          <Shield className="h-4 w-4 mr-2" /> Start Verification
+                        </Button>
+                      )}
+
+                      {/* Employer: Review Submitted Work */}
+                      {user?.id === job.employerId && job.status === "Completed" && (
+                        <Button 
+                          variant="primary" 
+                          size="sm" 
+                          as={Link} 
+                          to={`/verification/${job.id}/review`}
+                          className="flex-1 md:flex-none shadow-lg shadow-sky-500/20 bg-gradient-to-r from-sky-500 to-primary"
+                        >
+                          <Eye className="h-4 w-4 mr-2" /> Review Work
+                        </Button>
+                      )}
                       
-                      {user.id === job.employerId && (
+                      {user?.id === job.employerId && (
                         <Button 
                           variant="primary" 
                           size="sm" 
@@ -223,13 +251,13 @@ export function ActiveContractsPage() {
                         </Button>
                       )}
 
-                      {user.id === job.employerId && !job.isDisputed && (
+                      {user?.id === job.employerId && !job.isDisputed && (
                         <Button variant="ghost" size="sm" onClick={() => handleDispute(job.id)} className="text-red-400 hover:text-red-300 flex-1 md:flex-none">
                           <AlertTriangle className="h-4 w-4 mr-2" /> Dispute
                         </Button>
                       )}
 
-                      {user.id === job.workerId && job.status !== "Completed" && (
+                      {user?.id === job.workerId && job.status !== "Completed" && job.status !== "In Progress" && (
                         <Button 
                           variant="primary" 
                           size="sm" 
@@ -240,7 +268,7 @@ export function ActiveContractsPage() {
                         </Button>
                       )}
 
-                      {user.id === job.workerId && job.status === "Completed" && (
+                      {user?.id === job.workerId && job.status === "Completed" && (
                         <Badge tone="sky" className="h-9 px-4">Waiting for Release</Badge>
                       )}
                     </div>

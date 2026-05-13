@@ -19,6 +19,7 @@ export const Job = sequelize.define("Job", {
   workerId: { type: DataTypes.UUID, allowNull: true },
   applicants: { type: DataTypes.ARRAY(DataTypes.UUID), defaultValue: [] },
   status: { type: DataTypes.STRING, defaultValue: "Open" },
+  startDate: { type: DataTypes.STRING, allowNull: true },
   isDisputed: { type: DataTypes.BOOLEAN, defaultValue: false },
   escrowStatus: { type: DataTypes.ENUM("Optional", "Ready", "Locked", "Released", "Refunded"), defaultValue: "Optional" }
 }, {

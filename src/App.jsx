@@ -15,6 +15,8 @@ import { AdminPage } from "./pages/AdminPage.jsx";
 import { JobDetailsPage } from "./pages/JobDetailsPage.jsx";
 import { FindWorkersPage } from "./pages/FindWorkersPage.jsx";
 import { ActiveContractsPage } from "./pages/ActiveContractsPage.jsx";
+import { WorkerVerificationPage } from "./pages/WorkerVerificationPage.jsx";
+import { ClientReviewPage } from "./pages/ClientReviewPage.jsx";
 
 export default function App() {
   return (
@@ -37,6 +39,8 @@ export default function App() {
           <Route path="/profile/:id" element={<ProfilePage />} />
           <Route path="/wallet" element={<WalletPage />} />
           <Route path="/chat/:id" element={<ChatPage />} />
+          <Route path="/verification/:jobId" element={<WorkerVerificationPage />} />
+          <Route path="/verification/:jobId/review" element={<ClientReviewPage />} />
           <Route path="/admin" element={<AdminPage />} />
         </Route>
       </Route>

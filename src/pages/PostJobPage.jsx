@@ -22,7 +22,9 @@ const jobSchema = z.object({
   location: z.string().min(3, "Required"),
   duration: z.string().min(1, "Required"),
   escrow: z.string(),
-  description: z.string().min(10, "Description must be at least 10 characters")
+  description: z.string().min(10, "Description must be at least 10 characters"),
+  startDate: z.string().min(1, "Required"),
+  workersNeeded: z.coerce.number().min(1, "Must be at least 1")
 });
 
 export function PostJobPage() {
@@ -43,7 +45,9 @@ export function PostJobPage() {
       location: user.location || "",
       duration: "",
       escrow: "Ready",
-      description: ""
+      description: "",
+      startDate: new Date().toISOString().split('T')[0],
+      workersNeeded: 1
     }
   });
 
@@ -87,6 +91,8 @@ export function PostJobPage() {
         escrowStatus: data.lockBudgetNow ? "Locked" : "Ready",
         lockBudgetNow: data.lockBudgetNow,
         description: data.description,
+        startDate: data.startDate,
+        workersNeeded: data.workersNeeded,
         sitePhoto,
         coordinates: position ? JSON.stringify(position) : null
       };
@@ -169,6 +175,16 @@ export function PostJobPage() {
               <input {...register("location")} className="field mt-2" placeholder="e.g. Rajarampuri, Kolhapur" />
               {errors.location && <span className="text-xs text-destructive">{errors.location.message}</span>}
             </div>
+            <label className="grid gap-2 text-sm font-semibold">
+              Work Date
+              <input {...register("startDate")} className="field" type="date" />
+              {errors.startDate && <span className="text-xs text-destructive">{errors.startDate.message}</span>}
+            </label>
+            <label className="grid gap-2 text-sm font-semibold">
+              Vacancies (Workers Needed)
+              <input {...register("workersNeeded")} className="field" type="number" placeholder="e.g. 3" />
+              {errors.workersNeeded && <span className="text-xs text-destructive">{errors.workersNeeded.message}</span>}
+            </label>
             <label className="grid gap-2 text-sm font-semibold">
               Duration
               <input {...register("duration")} className="field" placeholder="e.g. 2 days, 4 hours" />

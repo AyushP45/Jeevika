@@ -282,13 +282,22 @@ export function LoginPage() {
     if (!validate()) return;
     setIsLoading(true);
     try {
+      // Helper to ensure phone has +91
+      const normalizePhone = (p) => {
+        const clean = p.replace(/\D/g, "");
+        if (clean.length === 10) return `+91${clean}`;
+        if (clean.length === 12 && clean.startsWith("91")) return `+${clean}`;
+        return `+${clean}`;
+      };
+
       const payload = loginMethod === "email"
         ? { email: formData.email, password: formData.password }
-        : { phone: formData.phone, password: formData.password };
+        : { phone: normalizePhone(formData.phone), password: formData.password };
+
       const { token, user } = await authApi.login(payload);
       saveToken(token);
       loginWithUser(user);
-      toast.success(`Welcome back, ${user.name?.split(" ")[0] || "there"}!`);
+      toast.success(`Welcome back, ${user.name?.split(" ")[0]}!`);
       navigate("/dashboard");
     } catch (err) {
       if (err.field === "email" || err.field === "phone") {

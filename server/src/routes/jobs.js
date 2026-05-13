@@ -9,7 +9,28 @@ const router = express.Router();
 // GET /api/jobs — list jobs with optional filters
 router.get("/", async (req, res) => {
   try {
-    const where = { status: "Open" };
+    // 1. Base filter: Always show Open jobs
+    let userWhere = { status: "Open" };
+    
+    // Check if we have a token/user (simple check since this route is public)
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const { id } = (await import("jsonwebtoken")).default.verify(token, process.env.JWT_SECRET || "dev-secret");
+        if (id) {
+          // If logged in, show Open jobs + my In Progress/Completed jobs
+          userWhere = {
+            [Op.or]: [
+              { status: "Open" },
+              { [Op.and]: [{ status: ["In Progress", "Completed"] }, { [Op.or]: [{ employerId: id }, { workerId: id }] }] }
+            ]
+          };
+        }
+      } catch (e) { /* invalid token, stick to public Open jobs */ }
+    }
+
+    const where = userWhere;
     if (req.query.type && req.query.type !== "All") where.type = req.query.type;
     if (req.query.category) {
       where.category = { [Op.iLike]: `%${req.query.category}%` };

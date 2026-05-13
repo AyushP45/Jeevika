@@ -15,6 +15,7 @@ import chatRoutes from "./routes/chat.js";
 import notificationRoutes from "./routes/notifications.js";
 import workerRoutes from "./routes/workers.js";
 import reviewRoutes from "./routes/reviews.js";
+import verificationRoutes from "./routes/verification.js";
 
 dotenv.config({ path: "server/.env" });
 
@@ -34,16 +35,38 @@ app.use(express.json({ limit: "10mb" }));
 app.set("io", io);
 notificationService.setIo(io);
 
+const onlineUsers = new Set();
+
 io.on("connection", (socket) => {
-  console.log("A user connected:", socket.id);
+  let currentUserId = null;
 
   socket.on("join", (userId) => {
+    currentUserId = userId;
     socket.join(userId);
-    console.log(`User ${userId} joined their private room.`);
+    onlineUsers.add(userId);
+    io.emit("user_online", userId);
+    console.log(`User ${userId} is now online.`);
+  });
+
+  socket.on("typing", ({ recipientId, jobId }) => {
+    socket.to(recipientId).emit("user_typing", { senderId: currentUserId, jobId });
+  });
+
+  socket.on("stop_typing", ({ recipientId, jobId }) => {
+    socket.to(recipientId).emit("user_stop_typing", { senderId: currentUserId, jobId });
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected");
+    if (currentUserId) {
+      onlineUsers.delete(currentUserId);
+      io.emit("user_offline", currentUserId);
+      console.log(`User ${currentUserId} went offline.`);
+    }
+  });
+
+  // Helper for frontend to check initial state
+  socket.on("check_online", (userId, callback) => {
+    callback(onlineUsers.has(userId));
   });
 });
 
@@ -59,6 +82,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/workers", workerRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/verification", verificationRoutes);
 
 const port = process.env.PORT || 4000;
 

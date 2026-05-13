@@ -10,7 +10,8 @@ import {
   Users, 
   PlusCircle,
   FileText,
-  UserPlus
+  UserPlus,
+  Calendar
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -30,7 +31,7 @@ export function DashboardPage() {
   const { user, jobs, setJobs, availability, toggleAvailability, applications } = useJeevikaStore();
   const [loadingJobs, setLoadingJobs] = useState(false);
 
-  const isEmployer = user.role === "employer";
+  const isEmployer = user?.role === "employer";
 
   const roleTitle = isEmployer ? "Employer hiring dashboard" : "Worker dashboard";
 
@@ -65,7 +66,7 @@ export function DashboardPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <Badge tone="emerald">{roleTitle}</Badge>
-              <h1 className="mt-4 text-4xl font-black">Namaste, {user.name?.split(" ")[0] || "there"}.</h1>
+              <h1 className="mt-4 text-4xl font-black">Namaste, {user?.name?.split(" ")[0] || "there"}.</h1>
               <p className="mt-3 max-w-2xl text-muted-foreground">
                 {isEmployer 
                   ? "Track your job postings, manage incoming applications, and release escrow payments securely."
@@ -95,9 +96,9 @@ export function DashboardPage() {
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {isEmployer ? (
               <>
-                <StatCard label="Active jobs" value={jobs.filter(j => j.employerId === user.id && !j.workerId).length || 0} detail="currently hiring" icon={Briefcase} />
-                <StatCard label="Locked Escrow" value={formatINR(jobs.filter(j => j.employerId === user.id && j.escrowStatus === "Locked").reduce((acc, j) => acc + (j.budget || 0), 0))} detail="secured for workers" icon={ShieldCheck} />
-                <StatCard label="Assignments" value={jobs.filter(j => j.employerId === user.id && j.workerId).length} detail="active contracts" icon={Users} />
+                <StatCard label="Active jobs" value={jobs.filter(j => j.employerId === user?.id && !j.workerId).length || 0} detail="currently hiring" icon={Briefcase} />
+                <StatCard label="Locked Escrow" value={formatINR(jobs.filter(j => j.employerId === user?.id && j.escrowStatus === "Locked").reduce((acc, j) => acc + (j.budget || 0), 0))} detail="secured for workers" icon={ShieldCheck} />
+                <StatCard label="Assignments" value={jobs.filter(j => j.employerId === user?.id && j.workerId).length} detail="active contracts" icon={Users} />
               </>
             ) : (
               <>
@@ -141,9 +142,28 @@ export function DashboardPage() {
       <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <div>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-2xl font-black">
-              {isEmployer ? "Manage your jobs" : "Nearby jobs"}
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-black">
+                {isEmployer ? "Manage your jobs" : "Nearby jobs"}
+              </h2>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  toast.promise(jobsApi.list().then(setJobs), {
+                    loading: 'Refreshing feed...',
+                    success: 'Feed updated!',
+                    error: 'Failed to refresh'
+                  });
+                }}
+                className="h-8 w-8 p-0 rounded-full hover:bg-white/10"
+                title="Refresh jobs"
+              >
+                <motion.div whileTap={{ rotate: 180 }} transition={{ duration: 0.3 }}>
+                  <Activity className="h-4 w-4" />
+                </motion.div>
+              </Button>
+            </div>
             <Button as={Link} to={isEmployer ? "/post-job" : "/jobs"} variant="ghost">
               {isEmployer ? "View all posts" : "Browse all"}
             </Button>
@@ -170,8 +190,8 @@ export function DashboardPage() {
             <div className="grid gap-4 lg:grid-cols-2">
               {isEmployer ? (
                 // Employer see their own jobs only
-                jobs.filter(j => j.employerId === user.id).length > 0 ? (
-                  jobs.filter(j => j.employerId === user.id).slice(0, 4).map((job) => (
+                jobs.filter(j => j.employerId === user?.id).length > 0 ? (
+                  jobs.filter(j => j.employerId === user?.id).slice(0, 4).map((job) => (
                     <JobCard key={job.id} job={job} isManagementView />
                   ))
                 ) : (
@@ -181,10 +201,31 @@ export function DashboardPage() {
                   </div>
                 )
               ) : (
-                // Workers see available jobs (excluding their own if any)
-                jobs.filter(j => j.employerId !== user.id).slice(0, 4).map((job) => (
-                  <JobCard key={job.id} job={job} />
-                ))
+                // Workers see available jobs matching their skills
+                (() => {
+                  const availableJobs = jobs.filter(j => j.employerId !== user?.id && j.status === "Open");
+                  const userSkills = user?.skills || [];
+                  
+                  const matchedJobs = userSkills.length > 0 
+                    ? availableJobs.filter(j => 
+                        userSkills.some(skill => 
+                          j.category?.toLowerCase().includes(skill.toLowerCase()) || 
+                          skill.toLowerCase().includes(j.category?.toLowerCase())
+                        )
+                      )
+                    : availableJobs;
+
+                  return matchedJobs.length > 0 ? (
+                    matchedJobs.slice(0, 6).map((job) => (
+                      <JobCard key={job.id} job={job} />
+                    ))
+                  ) : (
+                    <div className="col-span-full rounded-2xl border border-dashed border-white/20 p-12 text-center">
+                      <p className="text-muted-foreground">No jobs matching your skills found nearby.</p>
+                      <Button as={Link} to="/jobs" variant="ghost" className="mt-2">View all available jobs</Button>
+                    </div>
+                  );
+                })()
               )}
             </div>
           )}
@@ -192,34 +233,55 @@ export function DashboardPage() {
 
         {/* ─── Sidebar ────────────────────────────────────────── */}
         <aside className="grid gap-4">
-          {isEmployer ? (
-            <Card className="p-6">
-              <h2 className="text-xl font-black">Employer tools</h2>
-              <div className="mt-4 grid gap-3">
-                <Button variant="outline" as={Link} to="/find-workers" className="justify-start gap-3 w-full h-12">
-                  <UserPlus className="h-4 w-4" /> Find new workers
-                </Button>
-                <Button variant="outline" as={Link} to="/active-contracts" className="justify-start gap-3 w-full h-12">
-                  <FileText className="h-4 w-4" /> View active contracts
-                </Button>
-                <Button variant="outline" as={Link} to="/wallet" className="justify-start gap-3 w-full h-12">
-                  <BadgeIndianRupee className="h-4 w-4" /> Escrow history
-                </Button>
-              </div>
-            </Card>
-          ) : (
-            <Card className="p-6">
-              <h2 className="text-xl font-black">Hiring tracker</h2>
-              {["Requirement posted", "3 trusted matches", "Escrow ready", "Work completion pending"].map((item, index) => (
-                <div key={item} className="mt-4 flex items-center gap-3">
-                  <div className="grid h-8 w-8 place-items-center rounded-full bg-primary/15 text-sm font-bold text-primary">
-                    {index + 1}
+          {/* ─── Side: Tasks / Bids ─── */}
+          <Card className="border-primary/20 bg-primary/5 p-6">
+            <h3 className="text-xl font-black mb-4">
+              {isEmployer ? "Open Requirements" : "Your Applications"}
+            </h3>
+            <div className="space-y-3">
+                {jobs.filter(j => isEmployer ? (j.employerId === user?.id && j.status === "Open") : (Array.isArray(j.applicants) && j.applicants.includes(user?.id))).length === 0 ? (
+                  <div className="py-8 text-center border border-dashed border-white/10 rounded-2xl">
+                    <p className="text-xs text-muted-foreground">No pending {isEmployer ? "posts" : "bids"}</p>
                   </div>
-                  <p className="text-sm">{item}</p>
-                </div>
-              ))}
-            </Card>
-          )}
+                ) : (
+                  jobs.filter(j => isEmployer ? (j.employerId === user?.id && j.status === "Open") : (Array.isArray(j.applicants) && j.applicants.includes(user?.id))).map(j => (
+                    <Link key={j.id} to={`/jobs/${j.id}`} className="block p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                      <p className="font-bold text-sm truncate">{j.title}</p>
+                      <div className="flex items-center gap-3 my-1">
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          <Users className="h-3 w-3" /> {j.workersNeeded || 1}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          <Calendar className="h-3 w-3" /> {j.startDate || "TBD"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Badge tone="sky" className="text-[10px]">{j.status}</Badge>
+                        <p className="text-[10px] font-black text-emerald-400">{formatINR(j.budget)}</p>
+                      </div>
+                    </Link>
+                ))
+              )}
+            </div>
+            <Button as={Link} to={isEmployer ? "/post-job" : "/jobs"} variant="ghost" className="w-full mt-4 text-xs h-9">
+              {isEmployer ? "Post another" : "Find more work"}
+            </Button>
+          </Card>
+
+          <Card className="bg-slate-900/40 p-6">
+            <h3 className="text-xl font-black mb-4">Account Trust</h3>
+            <div className="mt-4 grid gap-3">
+              <Button variant="outline" as={Link} to="/find-workers" className="justify-start gap-3 w-full h-12">
+                <UserPlus className="h-4 w-4" /> Find new workers
+              </Button>
+              <Button variant="outline" as={Link} to="/active-contracts" className="justify-start gap-3 w-full h-12">
+                <FileText className="h-4 w-4" /> View active contracts
+              </Button>
+              <Button variant="outline" as={Link} to="/wallet" className="justify-start gap-3 w-full h-12">
+                <BadgeIndianRupee className="h-4 w-4" /> Escrow history
+              </Button>
+            </div>
+          </Card>
 
           <Card className="p-6">
             <h2 className="mb-4 text-xl font-black">

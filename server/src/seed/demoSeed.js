@@ -6,10 +6,7 @@ import { Job, Transaction, User } from "../models/associations.js";
  * Called once on server startup — safe to call multiple times.
  */
 export async function seedDemoData() {
-  const jobCount = await Job.count();
-  if (jobCount > 0) return; // Already seeded
-
-  console.log("Seeding demo data...");
+  console.log("Checking for demo data...");
   const passwordHash = await bcrypt.hash("jeevika123", 10);
 
   // ── Demo Users (findOrCreate to avoid conflicts with existing accounts) ──
@@ -75,9 +72,10 @@ export async function seedDemoData() {
       budget: 18500,
       duration: "3 days",
       employerId: employer.id,
+      workerId: worker.id,
       applicants: [worker.id],
-      status: "Open",
-      escrowStatus: "Ready"
+      status: "In Progress",
+      escrowStatus: "Locked"
     },
     {
       title: "Tractor with operator for plowing",
@@ -88,8 +86,9 @@ export async function seedDemoData() {
       budget: 6200,
       duration: "1 day",
       employerId: employer.id,
-      applicants: [],
-      status: "Matching",
+      workerId: worker.id,
+      applicants: [worker.id],
+      status: "Completed",
       escrowStatus: "Locked"
     },
     {

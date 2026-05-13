@@ -48,6 +48,8 @@ export const authApi = {
   login: (body) => request("POST", "/api/auth/login", body),
   googleAuth: (body) => request("POST", "/api/auth/google", body),
   forgotPassword: (body) => request("POST", "/api/auth/forgot-password", body),
+  sendOtp: (phone) => request("POST", "/api/auth/send-otp", { phone }),
+  verifyOtp: (phone, otp) => request("POST", "/api/auth/verify-otp", { phone, otp }),
   me: () => request("GET", "/api/auth/me"),
   updateProfile: (body) => request("PUT", "/api/auth/profile", body),
   verify: (body) => request("POST", "/api/auth/verify", body),
@@ -91,8 +93,10 @@ export const adminApi = {
   users: () => request("GET", "/api/admin/users"),
   suspend: (userId, isActive) => request("PUT", "/api/admin/suspend", { userId, isActive }),
   stats: () => request("GET", "/api/admin/stats"),
-  approveVerification: (userId) => request("POST", `/api/admin/verify/${userId}/approve`),
-  rejectVerification: (userId) => request("POST", `/api/admin/verify/${userId}/reject`)
+  jobs: () => request("GET", "/api/admin/jobs"),
+  releaseEscrow: (jobId) => request("POST", `/api/admin/jobs/${jobId}/release`),
+  kycApprove: (userId) => request("POST", `/api/admin/kyc/${userId}/approve`),
+  kycReject: (userId) => request("POST", `/api/admin/kyc/${userId}/reject`)
 };
 
 // ─── Chat ─────────────────────────────────────────────────
@@ -112,6 +116,18 @@ export const notificationApi = {
 export const reviewsApi = {
   create: (body) => request("POST", "/api/reviews", body),
   getForUser: (userId) => request("GET", `/api/reviews/${userId}`)
+};
+
+// ─── Verification ──────────────────────────────────────
+export const verificationApi = {
+  start: (jobId, body) => request("POST", `/api/verification/${jobId}/start`, body),
+  beforeProof: (jobId, body) => request("POST", `/api/verification/${jobId}/before-proof`, body),
+  ping: (jobId, body) => request("POST", `/api/verification/${jobId}/ping`, body),
+  complete: (jobId, body) => request("POST", `/api/verification/${jobId}/complete`, body),
+  get: (jobId) => request("GET", `/api/verification/${jobId}`),
+  review: (jobId, body) => request("POST", `/api/verification/${jobId}/review`, body),
+  myActive: () => request("GET", "/api/verification/my/active"),
+  adminAll: () => request("GET", "/api/verification/admin/all")
 };
 
 // ─── Token helpers ────────────────────────────────────────

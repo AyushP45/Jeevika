@@ -12,6 +12,7 @@ import {
   Eye,
   EyeOff,
   KeyRound,
+  Loader2,
   Mail,
   MapPin,
   Phone,
@@ -19,7 +20,8 @@ import {
   Sparkles,
   User,
   Wallet,
-  Wrench
+  Wrench,
+  CheckCircle2
 } from "lucide-react";
 import { Button } from "../components/ui/Button.jsx";
 import { Card, Badge } from "../components/ui/Card.jsx";
@@ -117,6 +119,13 @@ export function RegisterPage() {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
+  // OTP verification state
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpValue, setOtpValue] = useState("");
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
+
   // Worker fields
   const [workerForm, setWorkerForm] = useState({
     fullName: "", email: "", phone: "", skills: [], experience: "",
@@ -180,6 +189,62 @@ export function RegisterPage() {
     setErrors({});
   };
 
+  // OTP cooldown timer
+  const startCooldown = () => {
+    setOtpCooldown(60);
+    const timer = setInterval(() => {
+      setOtpCooldown((prev) => {
+        if (prev <= 1) { clearInterval(timer); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Normalize phone: remove spaces/dashes, ensure no duplicate +91
+  const normalizePhone = (raw) => {
+    let cleaned = raw.replace(/[\s\-]/g, "");
+    // If user typed +91 twice or it's missing, normalize
+    if (!cleaned.startsWith("+91") && /^[6-9]\d{9}$/.test(cleaned)) {
+      cleaned = "+91" + cleaned;
+    }
+    return cleaned;
+  };
+
+  const handleSendOtp = async () => {
+    const phone = normalizePhone(form.phone);
+    if (!phone || phone.length < 10) { setErrors(p => ({ ...p, phone: "Enter phone number first" })); return; }
+    if (!/^\+91[6-9]\d{9}$/.test(phone)) { setErrors(p => ({ ...p, phone: "Enter a valid Indian mobile number" })); return; }
+
+    setOtpLoading(true);
+    setErrors(p => ({ ...p, phone: "" }));
+    try {
+      await authApi.sendOtp(phone);
+      setOtpSent(true);
+      startCooldown();
+      toast.success("OTP sent! Check your server terminal for the code.");
+    } catch (err) {
+      toast.error(err.message || "Failed to send OTP");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    const phone = normalizePhone(form.phone);
+    if (!otpValue || otpValue.length !== 6) { toast.error("Enter the 6-digit OTP"); return; }
+
+    setOtpLoading(true);
+    try {
+      await authApi.verifyOtp(phone, otpValue);
+      setOtpVerified(true);
+      toast.success("Phone number verified!");
+    } catch (err) {
+      toast.error(err.message || "Invalid OTP");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
   const validate = () => {
     const e = {};
     if (!form.fullName.trim()) e.fullName = "Full name is required";
@@ -189,6 +254,7 @@ export function RegisterPage() {
     if (!form.phone.trim()) e.phone = "Mobile number is required";
     else if (!/^(\+91[\s-]?)?[6-9]\d{9}$/.test(form.phone.replace(/\s/g, "")))
       e.phone = "Enter a valid Indian mobile number";
+    if (!otpVerified) e.phone = "Please verify your phone number with OTP";
     if (!form.location.trim()) e.location = "Location is required";
     if (!form.upiId.trim()) e.upiId = "UPI ID is required";
     if (!form.password) e.password = "Password is required";
@@ -215,7 +281,7 @@ export function RegisterPage() {
       const payload = {
         name: form.fullName,
         email: form.email || undefined,
-        phone: form.phone,
+        phone: normalizePhone(form.phone),
         password: form.password,
         role: selectedRole,
         location: form.location,
@@ -387,7 +453,76 @@ export function RegisterPage() {
                       <div className="grid gap-5 sm:grid-cols-2">
                         {renderField("Full Name", "fullName", { icon: User, placeholder: "e.g. Asha Jadhav" })}
                         {renderField("Email (Optional)", "email", { type: "email", icon: Mail, placeholder: "you@example.com" })}
-                        {renderField("Mobile Number", "phone", { type: "tel", icon: Phone, placeholder: "+91 98765 43210" })}
+                        {/* Phone + OTP verification */}
+                        <label className="grid gap-2 text-sm font-semibold">
+                          Mobile Number
+                          <div className="relative">
+                            <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <input
+                              type="tel"
+                              className={`field pl-11 pr-28 ${errors.phone ? "border-red-500/60" : otpVerified ? "border-emerald-500/60" : ""}`}
+                              placeholder="+91 98765 43210"
+                              value={form.phone}
+                              onChange={(ev) => { updateField("phone", ev.target.value); setOtpVerified(false); setOtpSent(false); setOtpValue(""); }}
+                              disabled={otpVerified}
+                            />
+                            {otpVerified ? (
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs font-bold text-emerald-400">
+                                <CheckCircle2 className="h-4 w-4" /> Verified
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={handleSendOtp}
+                                disabled={otpLoading || otpCooldown > 0}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-primary/20 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/30 transition disabled:opacity-50"
+                              >
+                                {otpLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : otpCooldown > 0 ? `${otpCooldown}s` : otpSent ? "Resend" : "Send OTP"}
+                              </button>
+                            )}
+                          </div>
+                          {errors.phone && <span className="text-xs text-red-400">{errors.phone}</span>}
+                        </label>
+                        {/* OTP Input - shown after OTP is sent */}
+                        {otpSent && !otpVerified && (
+                          <div className="sm:col-span-2 rounded-2xl bg-white/5 border border-white/10 p-5">
+                            <label className="grid gap-3 text-sm font-semibold">
+                              <div className="flex items-center justify-between">
+                                <span>Enter 6-digit OTP</span>
+                                <span className="text-xs text-slate-500">Sent to {form.phone}</span>
+                              </div>
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  maxLength={6}
+                                  className="field text-center text-2xl font-black tracking-[0.5em] flex-1 h-14"
+                                  placeholder="● ● ● ● ● ●"
+                                  value={otpValue}
+                                  onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleVerifyOtp}
+                                  disabled={otpLoading || otpValue.length !== 6}
+                                  className="rounded-xl bg-emerald-500 px-6 py-2 text-sm font-bold text-white hover:bg-emerald-600 transition disabled:opacity-50 h-14"
+                                >
+                                  {otpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+                                </button>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs text-slate-500">Check your server terminal for the OTP code</p>
+                                {otpCooldown > 0 ? (
+                                  <p className="text-xs text-slate-500">Resend in <span className="font-bold text-primary">{otpCooldown}s</span></p>
+                                ) : (
+                                  <button type="button" onClick={handleSendOtp} className="text-xs font-bold text-primary hover:text-emerald-300 transition">
+                                    Resend OTP
+                                  </button>
+                                )}
+                              </div>
+                            </label>
+                          </div>
+                        )}
                         {renderField("Experience", "experience", { icon: Briefcase, placeholder: "e.g. 5 years painting" })}
                         {renderField("Location", "location", { icon: MapPin, placeholder: "Kolhapur, Maharashtra" })}
                         {renderField("UPI ID", "upiId", { icon: Wallet, placeholder: "yourname@upi" })}
@@ -472,7 +607,76 @@ export function RegisterPage() {
                       <div className="grid gap-5 sm:grid-cols-2">
                         {renderField("Full Name", "fullName", { icon: User, placeholder: "e.g. Suresh Patil" })}
                         {renderField("Company / Individual Name", "companyName", { icon: Briefcase, placeholder: "e.g. Patil Farms" })}
-                        {renderField("Mobile Number", "phone", { type: "tel", icon: Phone, placeholder: "+91 98765 43210" })}
+                        {/* Phone + OTP verification */}
+                        <label className="grid gap-2 text-sm font-semibold">
+                          Mobile Number
+                          <div className="relative">
+                            <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <input
+                              type="tel"
+                              className={`field pl-11 pr-28 ${errors.phone ? "border-red-500/60" : otpVerified ? "border-emerald-500/60" : ""}`}
+                              placeholder="+91 98765 43210"
+                              value={form.phone}
+                              onChange={(ev) => { updateField("phone", ev.target.value); setOtpVerified(false); setOtpSent(false); setOtpValue(""); }}
+                              disabled={otpVerified}
+                            />
+                            {otpVerified ? (
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs font-bold text-emerald-400">
+                                <CheckCircle2 className="h-4 w-4" /> Verified
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={handleSendOtp}
+                                disabled={otpLoading || otpCooldown > 0}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-primary/20 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/30 transition disabled:opacity-50"
+                              >
+                                {otpLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : otpCooldown > 0 ? `${otpCooldown}s` : otpSent ? "Resend" : "Send OTP"}
+                              </button>
+                            )}
+                          </div>
+                          {errors.phone && <span className="text-xs text-red-400">{errors.phone}</span>}
+                        </label>
+                        {/* OTP Input - shown after OTP is sent */}
+                        {otpSent && !otpVerified && (
+                          <div className="sm:col-span-2 rounded-2xl bg-white/5 border border-white/10 p-5">
+                            <label className="grid gap-3 text-sm font-semibold">
+                              <div className="flex items-center justify-between">
+                                <span>Enter 6-digit OTP</span>
+                                <span className="text-xs text-slate-500">Sent to {form.phone}</span>
+                              </div>
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  maxLength={6}
+                                  className="field text-center text-2xl font-black tracking-[0.5em] flex-1 h-14"
+                                  placeholder="● ● ● ● ● ●"
+                                  value={otpValue}
+                                  onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleVerifyOtp}
+                                  disabled={otpLoading || otpValue.length !== 6}
+                                  className="rounded-xl bg-emerald-500 px-6 py-2 text-sm font-bold text-white hover:bg-emerald-600 transition disabled:opacity-50 h-14"
+                                >
+                                  {otpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+                                </button>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs text-slate-500">Check your server terminal for the OTP code</p>
+                                {otpCooldown > 0 ? (
+                                  <p className="text-xs text-slate-500">Resend in <span className="font-bold text-primary">{otpCooldown}s</span></p>
+                                ) : (
+                                  <button type="button" onClick={handleSendOtp} className="text-xs font-bold text-primary hover:text-emerald-300 transition">
+                                    Resend OTP
+                                  </button>
+                                )}
+                              </div>
+                            </label>
+                          </div>
+                        )}
                         {renderField("Email (Optional)", "email", { type: "email", icon: Mail, placeholder: "you@example.com" })}
                         {renderField("UPI ID", "upiId", { icon: Wallet, placeholder: "business@upi" })}
                         {renderField("Location", "location", { icon: MapPin, placeholder: "Kolhapur, Maharashtra" })}

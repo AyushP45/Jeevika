@@ -5,6 +5,7 @@ import { Chat } from "./Chat.js";
 import { Notification } from "./Notification.js";
 import { Bid } from "./Bid.js";
 import { Review } from "./Review.js";
+import { JobVerification } from "./JobVerification.js";
 
 export function setupAssociations() {
   // User <-> Review
@@ -49,6 +50,14 @@ export function setupAssociations() {
   // User <-> Notification
   User.hasMany(Notification, { foreignKey: "userId", as: "notifications" });
   Notification.belongsTo(User, { foreignKey: "userId" });
+
+  // Job <-> JobVerification
+  Job.hasOne(JobVerification, { foreignKey: "jobId", as: "verification" });
+  JobVerification.belongsTo(Job, { foreignKey: "jobId", as: "job" });
+  User.hasMany(JobVerification, { foreignKey: "workerId", as: "workerVerifications" });
+  JobVerification.belongsTo(User, { foreignKey: "workerId", as: "worker" });
+  User.hasMany(JobVerification, { foreignKey: "clientId", as: "clientVerifications" });
+  JobVerification.belongsTo(User, { foreignKey: "clientId", as: "client" });
 }
 
-export { User, Job, Transaction, Chat, Notification, Bid, Review };
+export { User, Job, Transaction, Chat, Notification, Bid, Review, JobVerification };

@@ -26,6 +26,8 @@ router.get("/:jobId", requireAuth, async (req, res) => {
       job: {
         id: job.id,
         title: job.title,
+        employerId: job.employerId,
+        workerId: job.workerId,
         employerName: job.employer?.companyName || job.employer?.name,
         budget: job.budget,
         location: job.location,
@@ -58,6 +60,30 @@ router.post("/:jobId", requireAuth, async (req, res) => {
       senderId: req.user.id,
       text: text.trim()
     });
+
+    const fullMessage = await Chat.findByPk(message.id, {
+      include: [{ model: User, as: "sender", attributes: ["id", "name"] }]
+    });
+
+    // Notify recipient via Socket.io
+    const io = req.app.get("io");
+    if (io) {
+      const job = await Job.findByPk(req.params.jobId);
+      if (job) {
+        const recipientId = req.user.id === job.employerId ? job.workerId : job.employerId;
+        if (recipientId) {
+          io.to(recipientId).emit("new_message", {
+            jobId: job.id,
+            message: {
+              id: fullMessage.id,
+              sender: fullMessage.sender.name,
+              text: fullMessage.text,
+              createdAt: fullMessage.createdAt
+            }
+          });
+        }
+      }
+    }
 
     res.status(201).json({
       id: message.id,

@@ -6,7 +6,7 @@ export const useJeevikaStore = create((set, get) => ({
   // ─── Auth ─────────────────────────────────────────────
   // Check localStorage on startup so page refresh keeps user logged in
   isAuthenticated: hasToken(),
-  user: demoUser,
+  user: null, // Start as null, only use demoUser if needed for demo paths
   
   // ─── Demo / local state ───────────────────────────────
   jobs: demoJobs,
@@ -18,29 +18,20 @@ export const useJeevikaStore = create((set, get) => ({
   notifications: [],
 
   // ─── Auth actions ──────────────────────────────────────
-  /**
-   * Called after a successful API login/register.
-   * @param {object} realUser  — user object from server (no passwordHash)
-   */
   loginWithUser: (realUser) =>
     set({
       isAuthenticated: true,
       user: {
-        // Keep fallback demo shape so all pages don't break if a field is missing
-        ...demoUser,
         ...realUser,
         // Normalise wallet field (server uses walletBalance)
-        wallet: realUser.walletBalance ?? demoUser.wallet,
-        earnings: demoUser.earnings // server doesn't track daily earnings yet
+        wallet: realUser.walletBalance ?? 0,
+        earnings: 0
       }
     }),
 
-  /** Legacy shim — still used by demo paths */
-  login: () => set({ isAuthenticated: true }),
-
   logout: () => {
     clearToken();
-    set({ isAuthenticated: false, user: demoUser });
+    set({ isAuthenticated: false, user: null });
   },
 
   // ─── Profile ──────────────────────────────────────────

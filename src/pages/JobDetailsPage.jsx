@@ -193,7 +193,7 @@ export function JobDetailsPage() {
           </Card>
           
           {/* Employer View: Interested Workers / Bids */}
-          {user.role === 'employer' && job.employerId === user.id && !job.workerId && (
+          {user?.role === 'employer' && job.employerId === user?.id && !job.workerId && (
             <Card className="p-6 border-emerald-500/20 bg-emerald-500/5 shadow-xl shadow-emerald-500/5">
               <div className="flex items-center justify-between mb-6">
                 <div>

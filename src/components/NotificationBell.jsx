@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useJeevikaStore } from "../lib/store.js";
 import { notificationApi, authApi } from "../lib/api.js";
-import { connectSocket } from "../lib/socket.js";
+import { initSocket } from "../lib/socket.js";
 import { Button } from "./ui/Button.jsx";
 import { Badge } from "./ui/Card.jsx";
 import { toast } from "sonner";
@@ -30,7 +30,7 @@ export function NotificationBell() {
     
     // Phase 3: Real-time Socket Connection
     if (user && user.id) {
-      const socket = connectSocket(user.id);
+      const socket = initSocket(user.id);
       
       socket.on("notification", (notif) => {
         console.log("Real-time notification received:", notif);
